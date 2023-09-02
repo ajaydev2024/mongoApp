@@ -1,113 +1,224 @@
-import Image from 'next/image'
+"use client"
+import React, { useEffect, useState } from 'react';
 
-export default function Home() {
+const Page = () => {
+  const [productForm, setproductForm] = useState({})
+  const [query, setQuery] = useState('');
+  const [products, setProducts] = useState([])
+  const [alert, setAlert] = useState();
+  const [loadingAction, setloadingAction] = useState(false)
+  const [loading, setLoading] = useState(false);
+  const [dropdown, setDropdown] = useState([])
+  useEffect(() => {
+    const fetchProducts = async () => {
+      const response = await fetch('/api/product')
+      let rjson = await response.json();
+      setProducts(rjson.allProducts);
+    }
+    fetchProducts()
+  }, [])
+
+  const buttonAction = async (action, productName, initailQuantity) => {
+    let index = products.findIndex((item) => item.productName == productName)
+    let newProducts = JSON.parse(JSON.stringify(products))
+    if (action == "plus") {
+      newProducts[index].productQuantity = parseInt(initailQuantity) + 1
+      console.log(newProducts[index].productQuantity)
+    }
+    else {
+      newProducts[index].productQuantity = parseInt(initailQuantity) - 1
+    }
+    setProducts(newProducts) 
+
+    let indexDrop = dropdown.findIndex((item) => item.productName == productName)
+    let newDropDown = JSON.parse(JSON.stringify(dropdown))
+    console.log(indexDrop,"pasre ",newDropDown)
+
+    if (action == "plus") {
+      newDropDown[indexDrop].productQuantity = parseInt(initailQuantity) + 1
+      console.log(newDropDown[indexDrop].productQuantity)
+    }
+    else {
+      newDropDown[indexDrop].productQuantity = parseInt(initailQuantity) - 1
+    }
+    setDropdown(newDropDown)
+    setloadingAction(true)
+
+    const response = await fetch('/api/action', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ action, productName, initailQuantity })
+    });
+    let r = await response.json();
+    console.log("Action Button : ", r)
+    setloadingAction(false);
+
+  }
+
+  const addProduct = async (e) => {
+    e.preventDefault();
+    try {
+      const response = await fetch('/api/product', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify(productForm),
+      });
+      if (response.ok) {
+
+        setAlert("Your Product has been Added !")
+        setproductForm({})
+      }
+      else {
+        console.error('Failed to add product');
+      }
+    } catch (error) {
+      console.error('Error adding product:', error);
+    }
+    const response = await fetch('/api/product')
+    let rjson = await response.json();
+    setProducts(rjson.allProducts);
+
+  };
+
+  const handleChange = (e) => {
+    setproductForm({ ...productForm, [e.target.name]: e.target.value })
+  }
+
+  const onDropdownEdit = async (e) => {
+    let inputValue = e.target.value;
+    setQuery(inputValue);
+    if (query.length > 2) {
+      setLoading(true); 
+      setDropdown([]);
+      const response = await fetch('/api/search?query=' + query); // Use inputValue instead of query
+      let data = await response.json();
+      setDropdown(data.Product);
+      setLoading(false);
+    }
+  };
+
+
   return (
-    <main className="flex min-h-screen flex-col items-center justify-between p-24">
-      <div className="z-10 max-w-5xl w-full items-center justify-between font-mono text-sm lg:flex">
-        <p className="fixed left-0 top-0 flex w-full justify-center border-b border-gray-300 bg-gradient-to-b from-zinc-200 pb-6 pt-8 backdrop-blur-2xl dark:border-neutral-800 dark:bg-zinc-800/30 dark:from-inherit lg:static lg:w-auto  lg:rounded-xl lg:border lg:bg-gray-200 lg:p-4 lg:dark:bg-zinc-800/30">
-          Get started by editing&nbsp;
-          <code className="font-mono font-bold">app/page.js</code>
-        </p>
-        <div className="fixed bottom-0 left-0 flex h-48 w-full items-end justify-center bg-gradient-to-t from-white via-white dark:from-black dark:via-black lg:static lg:h-auto lg:w-auto lg:bg-none">
-          <a
-            className="pointer-events-none flex place-items-center gap-2 p-8 lg:pointer-events-auto lg:p-0"
-            href="https://vercel.com?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            By{' '}
-            <Image
-              src="/vercel.svg"
-              alt="Vercel Logo"
-              className="dark:invert"
-              width={100}
-              height={24}
-              priority
-            />
-          </a>
+    <>
+      <div className="container mx-auto p-4 bg-red-50">
+        <h1 className="text-3xl font-semibold mb-4 text-center">Current Stock</h1>
+        <div className='text-green-600 text-center'>{alert}</div>
+        <div className="m-4 flex">
+          <input
+            type="text"
+            id="productSearch"
+            name='productSearch'
+            // onBlur={()=>{setDropdown([])}}
+            onChange={onDropdownEdit}
+            placeholder="Search by product name"
+            className="w-full border rounded px-3 py-2 mt-1 focus:outline-none focus:border-blue-400"
+          />
+        </div>
+        {loading && <div className='flex'>
+          <svg fill="#fff" width="140" height="64" viewBox="0 0 140 64" xmlns="http://www.w3.org/2000/svg"></svg> </div>}
+        <div className='dropContainer absolute w-[2wh] bg-purple-200'>
+          {dropdown && dropdown.map(item => {
+            return (
+              <div key={item._id} className='flex justify-between  p-2 my-1 border-b-2'>
+                <span className="border p-2">{item.productName} ({item.productQuantity} available for ${item.productPrice}) </span>
+                <div className="mx-5">
+                  <button onClick={() => { buttonAction("minus", item.productName,item.productQuantity) }} disabled={loadingAction} className="subtract inline-block px-3 py-1 cursor-pointer bg-purple-500 text-white rounded-lg border p-2 disabled:bg-slate-300">-</button>
+                  <span className="inline-block min-w-3 mx-3 border p-2">{item.productQuantity}</span>
+                  <button onClick={() => { buttonAction("plus", item.productName,item.productQuantity) }} disabled={loadingAction}
+                    className="add inline-block px-3 py-1 cursor-pointer bg-purple-500 text-white rounded-lg border p-2 disabled:bg-slate-300">+</button>
+                </div>
+              </div>
+            );  
+          })}
+
+
+        </div>
+        <div className="bg-white p-6 rounded-md shadow-md">
+          <h2 className="text-xl font-semibold mb-4">Add a New Product</h2>
+          <form>
+            <div className="mb-4">
+              <label htmlFor="productName" className="block font-medium">
+                Product Name:
+              </label>
+              <input
+                type="text"
+                onChange={handleChange}
+                value={productForm?.productName || ""}
+                id="productName"
+                name="productName"
+                required
+                className="w-full border rounded px-3 py-2 mt-1 focus:outline-none focus:border-blue-400"
+              />
+            </div>
+            <div className="mb-4">
+              <label htmlFor="productPrice" className="block font-medium">
+                Price:
+              </label>
+              <input
+                type="number"
+                onChange={handleChange}
+                id="productPrice"
+                value={productForm?.productPrice || ""}
+                name="productPrice"
+                step="0.01"
+                required
+                className="w-full border rounded px-3 py-2 mt-1 focus:outline-none focus:border-blue-400"
+              />
+            </div>
+            <div className="mb-4">
+              <label htmlFor="productQuantity" className="block font-medium">
+                Quantity:
+              </label>
+              <input
+                type="number"
+                onChange={handleChange}
+                id="productQuantity"
+                value={productForm?.productQuantity || ""}
+                name="productQuantity"
+                required
+                className="w-full border rounded px-3 py-2 mt-1 focus:outline-none focus:border-blue-400"
+              />
+            </div>
+            <div>
+              <button
+                onClick={addProduct}
+                type="submit"
+                className="bg-blue-500 text-white px-4 py-2 rounded hover:bg-blue-600 focus:outline-none"
+              >
+                Add Product
+              </button>
+            </div>
+          </form>
+        </div>
+
+        <div className="m-6">
+          <h2 className="text-xl font-semibold mb-4">Stock Data</h2>
+          <table className="w-full border">
+            <thead>
+              <tr className="bg-gray-200">
+                <th className="border p-2">Product Name</th>
+                <th className="border p-2">Price</th>
+                <th className="border p-2">Quantity</th>
+              </tr>
+            </thead>
+            <tbody>
+              {products.map(item => (
+                <tr key={item._id}>
+                  <td className="border p-2">{item.productName}</td>
+                  <td className="border p-2">${item.productPrice}</td>
+                  <td className="border p-2">{item.productQuantity}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       </div>
+    </>
+  );
+};
 
-      <div className="relative flex place-items-center before:absolute before:h-[300px] before:w-[480px] before:-translate-x-1/2 before:rounded-full before:bg-gradient-radial before:from-white before:to-transparent before:blur-2xl before:content-[''] after:absolute after:-z-20 after:h-[180px] after:w-[240px] after:translate-x-1/3 after:bg-gradient-conic after:from-sky-200 after:via-blue-200 after:blur-2xl after:content-[''] before:dark:bg-gradient-to-br before:dark:from-transparent before:dark:to-blue-700 before:dark:opacity-10 after:dark:from-sky-900 after:dark:via-[#0141ff] after:dark:opacity-40 before:lg:h-[360px] z-[-1]">
-        <Image
-          className="relative dark:drop-shadow-[0_0_0.3rem_#ffffff70] dark:invert"
-          src="/next.svg"
-          alt="Next.js Logo"
-          width={180}
-          height={37}
-          priority
-        />
-      </div>
-
-      <div className="mb-32 grid text-center lg:max-w-5xl lg:w-full lg:mb-0 lg:grid-cols-4 lg:text-left">
-        <a
-          href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Docs{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Find in-depth information about Next.js features and API.
-          </p>
-        </a>
-
-        <a
-          href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800 hover:dark:bg-opacity-30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Learn{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Learn about Next.js in an interactive course with&nbsp;quizzes!
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Templates{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Explore the Next.js 13 playground.
-          </p>
-        </a>
-
-        <a
-          href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template&utm_campaign=create-next-app"
-          className="group rounded-lg border border-transparent px-5 py-4 transition-colors hover:border-gray-300 hover:bg-gray-100 hover:dark:border-neutral-700 hover:dark:bg-neutral-800/30"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <h2 className={`mb-3 text-2xl font-semibold`}>
-            Deploy{' '}
-            <span className="inline-block transition-transform group-hover:translate-x-1 motion-reduce:transform-none">
-              -&gt;
-            </span>
-          </h2>
-          <p className={`m-0 max-w-[30ch] text-sm opacity-50`}>
-            Instantly deploy your Next.js site to a shareable URL with Vercel.
-          </p>
-        </a>
-      </div>
-    </main>
-  )
-}
+export default Page;
